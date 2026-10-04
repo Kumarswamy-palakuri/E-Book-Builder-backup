@@ -88,7 +88,7 @@ const ResetStorageModal = ({
           <button
             type="button"
             onClick={onConfirm}
-            className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-black text-xs font-bold rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
             <span>Yes, Delete All Data</span>

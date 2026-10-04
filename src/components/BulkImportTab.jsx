@@ -24,6 +24,7 @@ import {
   FileCode,
   Tag,
   Check,
+  Key,
   Image as ImageIcon
 } from 'lucide-react';
 import { parseStructuredBulkText, detectChapterFromFilename } from '../utils/bulkTextParser';
@@ -36,6 +37,7 @@ import {
   cleanAndRespaceTelugu,
   translateEnglishToTelugu
 } from '../utils/translator';
+import { getStoredGeminiKey, saveStoredGeminiKey } from '../utils/storage';
 import MathRenderer from '../utils/mathParser';
 
 const SAMPLE_TEXT_TEMPLATE = `Chapter: Percentage
@@ -96,6 +98,9 @@ const BulkImportTab = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
   const [autoTranslateTelugu, setAutoTranslateTelugu] = useState(true);
+  const [geminiApiKey, setGeminiApiKey] = useState(getStoredGeminiKey() || '');
+  const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
+  const [apiKeyInputVal, setApiKeyInputVal] = useState(getStoredGeminiKey() || '');
   const [importSuccessCount, setImportSuccessCount] = useState(null);
 
   // Drag & drop and loaded file state
@@ -170,10 +175,10 @@ const BulkImportTab = ({
 
       let finalQuestions = withChapter;
       if (autoTranslateTelugu && finalQuestions.length > 0) {
-        setProcessingStatus('Auto-translating missing Telugu & formatting questions...');
-        finalQuestions = await processImportedQuestionsTelugu(withChapter, (curr, tot) => {
-          setProcessingStatus(`Translating & formatting Telugu: ${curr} of ${tot}...`);
-        }, false);
+        setProcessingStatus('Translating questions into natural exam Telugu...');
+        finalQuestions = await processImportedQuestionsTelugu(withChapter, (curr, tot, msg) => {
+          setProcessingStatus(msg || `Translating Telugu: ${curr} of ${tot}...`);
+        }, false, { geminiKey: geminiApiKey });
       }
 
       setPreviewQuestions(finalQuestions);
@@ -267,10 +272,10 @@ const BulkImportTab = ({
 
         let finalList = rawList;
         if (autoTranslateTelugu && rawList.length > 0) {
-          setProcessingStatus(`Auto-translating missing Telugu & formatting ${rawList.length} questions...`);
-          finalList = await processImportedQuestionsTelugu(rawList, (curr, tot) => {
-            setProcessingStatus(`Translating & formatting Telugu: question ${curr} of ${tot}...`);
-          }, false);
+          setProcessingStatus(`Translating into natural exam Telugu for ${rawList.length} questions...`);
+          finalList = await processImportedQuestionsTelugu(rawList, (curr, tot, msg) => {
+            setProcessingStatus(msg || `Translating Telugu: question ${curr} of ${tot}...`);
+          }, false, { geminiKey: geminiApiKey });
         }
 
         setPreviewQuestions(finalList);
@@ -374,10 +379,10 @@ const BulkImportTab = ({
       // Auto-translate if toggle is active
       let finalQuestions = allQuestions;
       if (autoTranslateTelugu && finalQuestions.length > 0) {
-        setProcessingStatus(`Translating missing Telugu for ${finalQuestions.length} questions across ${validFiles.length} files...`);
-        finalQuestions = await processImportedQuestionsTelugu(finalQuestions, (curr, tot) => {
-          setProcessingStatus(`Translating Telugu: ${curr} of ${tot} questions...`);
-        }, false);
+        setProcessingStatus(`Translating into natural exam Telugu for ${finalQuestions.length} questions across ${validFiles.length} files...`);
+        finalQuestions = await processImportedQuestionsTelugu(finalQuestions, (curr, tot, msg) => {
+          setProcessingStatus(msg || `Translating Telugu: ${curr} of ${tot} questions...`);
+        }, false, { geminiKey: geminiApiKey });
       }
 
       setPreviewQuestions(finalQuestions);
@@ -409,18 +414,46 @@ const BulkImportTab = ({
     e.target.value = '';
   };
 
-  // Force re-translate Telugu from English (English is primary and stays unchanged)
+  // Force re-translate Telugu from English into natural exam Telugu
   const handleRetranslateTelugu = async (forceAll = true) => {
     if (previewQuestions.length === 0 || isProcessing) return;
     setIsProcessing(true);
-    setProcessingStatus('Translating all questions from English to Telugu & fixing spacing...');
+    setProcessingStatus('Translating all questions into natural, reasonable exam Telugu...');
     try {
-      const processed = await processImportedQuestionsTelugu(previewQuestions, (curr, tot) => {
-        setProcessingStatus(`Translating & respacing Telugu: ${curr} of ${tot}...`);
-      }, true);
+      const processed = await processImportedQuestionsTelugu(previewQuestions, (curr, tot, msg) => {
+        setProcessingStatus(msg || `Translating to natural Telugu: ${curr} of ${tot}...`);
+      }, true, { geminiKey: geminiApiKey });
       setPreviewQuestions(processed);
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus('');
+    }
+  };
+
+  // Translate a single question row on demand
+  const handleTranslateSingleRow = async (questionId) => {
+    const q = previewQuestions.find(item => item.id === questionId);
+    if (!q || !q.englishQuestion || isProcessing) return;
+    setIsProcessing(true);
+    setProcessingStatus(`Translating Question into natural exam Telugu...`);
+    try {
+      const translated = await translateEnglishToTelugu(q.englishQuestion, { geminiKey: geminiApiKey });
+      if (translated) {
+        setPreviewQuestions(prev => prev.map(item => {
+          if (item.id === questionId) {
+            return {
+              ...item,
+              teluguQuestion: translated,
+              _teluguAutoTranslated: true
+            };
+          }
+          return item;
+        }));
+      }
+    } catch (err) {
+      console.error('Single translation error:', err);
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
@@ -536,8 +569,8 @@ const BulkImportTab = ({
               <button
                 onClick={() => setActiveMode('text')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${activeMode === 'text'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                   }`}
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -546,8 +579,8 @@ const BulkImportTab = ({
               <button
                 onClick={() => setActiveMode('file')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${activeMode === 'file'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                   }`}
               >
                 <FileUp className="w-3.5 h-3.5" />
@@ -624,12 +657,12 @@ const BulkImportTab = ({
             }}
             onClick={() => txtFileInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-2xl p-5 text-center transition-all cursor-pointer select-none ${isDraggingTxt
-                ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-md ring-4 ring-blue-500/20 scale-[1.01]'
-                : batchFilesSummary
-                  ? 'border-purple-300 dark:border-purple-700/60 bg-purple-50/30 dark:bg-purple-950/20 hover:border-purple-500'
-                  : loadedFileInfo
-                    ? 'border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/40 dark:bg-emerald-950/20 hover:border-emerald-500'
-                    : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 hover:border-blue-500 hover:bg-slate-50 dark:hover:bg-slate-800/70'
+              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-md ring-4 ring-blue-500/20 scale-[1.01]'
+              : batchFilesSummary
+                ? 'border-purple-300 dark:border-purple-700/60 bg-purple-50/30 dark:bg-purple-950/20 hover:border-purple-500'
+                : loadedFileInfo
+                  ? 'border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/40 dark:bg-emerald-950/20 hover:border-emerald-500'
+                  : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 hover:border-blue-500 hover:bg-slate-50 dark:hover:bg-slate-800/70'
               }`}
           >
             <input
@@ -765,22 +798,46 @@ const BulkImportTab = ({
           </div>
 
           {/* Telugu Translation & Spacing Toggle */}
-          <div className="p-3 bg-blue-50/70 dark:bg-slate-800/80 border border-blue-200 dark:border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-200 select-none">
-              <input
-                type="checkbox"
-                checked={autoTranslateTelugu}
-                onChange={(e) => setAutoTranslateTelugu(e.target.checked)}
-                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 cursor-pointer"
-              />
-              <div className="flex items-center gap-1.5">
-                <Languages className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Auto-translate missing Telugu from English & format Telugu spacing</span>
-              </div>
-            </label>
-            <span className="text-3xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800">
-              Preserves existing Telugu • Translates missing Telugu
-            </span>
+          <div className="p-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-purple-50/90 dark:from-slate-800/90 dark:via-slate-800/60 dark:to-purple-950/30 border border-blue-200 dark:border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-900 dark:text-slate-100 select-none">
+                <input
+                  type="checkbox"
+                  checked={autoTranslateTelugu}
+                  onChange={(e) => setAutoTranslateTelugu(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                />
+                <div className="flex items-center gap-1.5">
+                  <Languages className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Translate questions to natural, reasonable Telugu (not robotic)</span>
+                </div>
+              </label>
+              <p className="text-3xs text-slate-500 dark:text-slate-400 pl-6.5">
+                Translates into natural exam Telugu sentences (కొన్న వెల, అమ్మిన వెల, స్తంభం, చక్రవడ్డీ, natural SOV grammar)
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setApiKeyInputVal(geminiApiKey);
+                  setIsGeminiModalOpen(true);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-3xs font-semibold border transition-colors cursor-pointer ${
+                  geminiApiKey?.trim()
+                    ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                }`}
+                title="Configure Google Gemini Free AI key for 100% human-grade Telugu exam phrasing"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>{geminiApiKey?.trim() ? 'Gemini AI Active' : 'AI Key (Optional)'}</span>
+              </button>
+              <span className="text-3xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800">
+                Preserves existing Telugu • Translates missing
+              </span>
+            </div>
           </div>
 
           {/* Text Area with Direct Drag & Drop Support */}
@@ -815,8 +872,8 @@ const BulkImportTab = ({
               }}
               placeholder="Paste questions in structured format (Chapter: ..., Q1: ..., English: ..., Telugu: ..., A: ..., B: ..., C: ..., D: ..., Answer: ...) or drag and drop single/multiple .txt files directly here"
               className={`w-full p-4 font-mono text-xs bg-slate-50 dark:bg-slate-800/80 border rounded-xl leading-relaxed resize-y transition-all ${isDraggingTextarea
-                  ? 'border-blue-500 ring-4 ring-blue-500/20 bg-blue-50/60 dark:bg-blue-950/30'
-                  : 'border-slate-200 dark:border-slate-700'
+                ? 'border-blue-500 ring-4 ring-blue-500/20 bg-blue-50/60 dark:bg-blue-950/30'
+                : 'border-slate-200 dark:border-slate-700'
                 }`}
             />
             {isDraggingTextarea && (
@@ -871,8 +928,8 @@ const BulkImportTab = ({
               }
             }}
             className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${isDraggingFile
-                ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 ring-4 ring-blue-500/20 scale-[1.01]'
-                : 'border-slate-300 dark:border-slate-700 hover:border-blue-500'
+              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 ring-4 ring-blue-500/20 scale-[1.01]'
+              : 'border-slate-300 dark:border-slate-700 hover:border-blue-500'
               }`}
           >
             <UploadCloud className={`w-12 h-12 text-blue-500 mx-auto mb-3 ${isDraggingFile ? 'animate-bounce' : ''}`} />
@@ -886,22 +943,46 @@ const BulkImportTab = ({
             </p>
 
             {/* Telugu Translation & Spacing Toggle */}
-            <div className="my-4 max-w-xl mx-auto p-3 bg-blue-50/70 dark:bg-slate-800/80 border border-blue-200 dark:border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-200 select-none">
-                <input
-                  type="checkbox"
-                  checked={autoTranslateTelugu}
-                  onChange={(e) => setAutoTranslateTelugu(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 cursor-pointer"
-                />
-                <div className="flex items-center gap-1.5">
-                  <Languages className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>Auto-translate missing Telugu from English & format Telugu spacing</span>
-                </div>
-              </label>
-              <span className="text-3xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800 whitespace-nowrap">
-                Preserves existing Telugu • Translates missing Telugu
-              </span>
+            <div className="my-4 max-w-xl mx-auto p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-purple-50/90 dark:from-slate-800/90 dark:via-slate-800/60 dark:to-purple-950/30 border border-blue-200 dark:border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+              <div className="space-y-0.5">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-900 dark:text-slate-100 select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoTranslateTelugu}
+                    onChange={(e) => setAutoTranslateTelugu(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <Languages className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span>Translate questions to natural, reasonable Telugu (not robotic)</span>
+                  </div>
+                </label>
+                <p className="text-3xs text-slate-500 dark:text-slate-400 pl-6.5">
+                  Translates into official competitive exam phrasing (కొన్న వెల, అమ్మిన వెల, స్తంభం, చక్రవడ్డీ, natural SOV grammar)
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiKeyInputVal(geminiApiKey);
+                    setIsGeminiModalOpen(true);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-3xs font-semibold border transition-colors cursor-pointer ${
+                    geminiApiKey?.trim()
+                      ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                  }`}
+                  title="Configure Google Gemini Free AI key for 100% human-grade Telugu exam phrasing"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>{geminiApiKey?.trim() ? 'Gemini Active' : 'AI Key'}</span>
+                </button>
+                <span className="text-3xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800 whitespace-nowrap">
+                  Preserves existing • Translates missing
+                </span>
+              </div>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
@@ -1230,20 +1311,33 @@ const BulkImportTab = ({
                         )}
                       </td>
                       <td className="p-2.5 max-w-xs font-telugu font-bold text-red-600 dark:text-red-400">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">
-                            <MathRenderer text={q.teluguQuestion} />
-                          </span>
-                          {q._teluguAutoTranslated && (
-                            <span className="shrink-0 px-1.5 py-0.5 text-3xs font-sans font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800">
-                              Translated
+                        <div className="flex items-start justify-between gap-1.5">
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <span className="leading-snug break-words">
+                              <MathRenderer text={q.teluguQuestion || 'తెలుగు ప్రశ్న లేదు'} />
                             </span>
-                          )}
-                          {q._teluguRespaced && !q._teluguAutoTranslated && (
-                            <span className="shrink-0 px-1.5 py-0.5 text-3xs font-sans font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-800">
-                              Respaced
-                            </span>
-                          )}
+                            <div className="flex items-center gap-1">
+                              {q._teluguAutoTranslated && (
+                                <span className="shrink-0 px-1.5 py-0.2 text-3xs font-sans font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800">
+                                  Natural Telugu
+                                </span>
+                              )}
+                              {q._teluguRespaced && !q._teluguAutoTranslated && (
+                                <span className="shrink-0 px-1.5 py-0.2 text-3xs font-sans font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-800">
+                                  Respaced
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleTranslateSingleRow(q.id)}
+                            disabled={isProcessing}
+                            title="Translate / Re-translate this question to natural Telugu"
+                            className="shrink-0 p-1.5 hover:bg-red-50 dark:hover:bg-red-950/60 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-900"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                       <td className="p-2.5 text-2xs text-slate-600 dark:text-slate-400">
@@ -1298,6 +1392,110 @@ const BulkImportTab = ({
             >
               Import All {previewQuestions.length} Questions to Database & PDF
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI Key & Translation Engine Modal */}
+      {isGeminiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center">
+                  <Languages className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Telugu Translation Settings
+                  </h3>
+                  <p className="text-3xs text-slate-500">
+                    Natural, reasonable exam sentence translation
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGeminiModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="space-y-2">
+                <label className="block font-semibold text-slate-800 dark:text-slate-200">
+                  Google Gemini Free API Key (Optional)
+                </label>
+                <input
+                  type="password"
+                  placeholder="AIzaSy... (Leave empty for Free Neural Engine)"
+                  value={apiKeyInputVal}
+                  onChange={(e) => setApiKeyInputVal(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-3xs text-slate-500 leading-relaxed">
+                  With a Gemini API key, questions are translated with 100% human-grade, native Telugu competitive exam fluency. A free key with 1,500 free requests per day is available from Google AI Studio.
+                </p>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-3xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <span>Get Free Gemini Key from Google AI Studio</span>
+                  <span>↗</span>
+                </a>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 space-y-1">
+                <span className="font-bold text-purple-900 dark:text-purple-200 text-3xs flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  Active Translation Mode:
+                </span>
+                <p className="text-3xs text-purple-700 dark:text-purple-300">
+                  {apiKeyInputVal?.trim()
+                    ? '✨ Google Gemini AI: High-Accuracy Exam Telugu'
+                    : '⚡ Free Neural Cloud Engine + Math Linguistic Normalizer (No Key Needed)'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiKeyInputVal('');
+                    setGeminiApiKey('');
+                    saveStoredGeminiKey('');
+                    setIsGeminiModalOpen(false);
+                  }}
+                  className="px-3 py-1.5 text-2xs text-slate-500 hover:text-red-500 font-semibold cursor-pointer"
+                >
+                  Clear Key
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsGeminiModalOpen(false)}
+                    className="px-3 py-1.5 text-2xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = apiKeyInputVal.trim();
+                      setGeminiApiKey(trimmed);
+                      saveStoredGeminiKey(trimmed);
+                      setIsGeminiModalOpen(false);
+                    }}
+                    className="px-4 py-1.5 text-2xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg cursor-pointer shadow-xs"
+                  >
+                    Save & Use Engine
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

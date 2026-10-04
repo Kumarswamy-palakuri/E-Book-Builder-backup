@@ -225,11 +225,11 @@ const QuestionBuilderTab = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-200">
-      
+
       {/* LEFT COLUMN: Question Entry Form (7 cols on lg) */}
       <div className="lg:col-span-7 space-y-4">
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs p-5 md:p-6">
-          
+
           {/* Header & Status */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
@@ -261,7 +261,7 @@ const QuestionBuilderTab = ({
 
           {/* Form Fields */}
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-            
+
             {/* Row 1: Book Edition, Chapter & Question Number */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               {books && books.length > 0 && (
@@ -428,11 +428,10 @@ const QuestionBuilderTab = ({
                 <button
                   type="button"
                   onClick={() => setQuestionColumnsLayout('two')}
-                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                    questionColumnsLayout === 'two'
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${questionColumnsLayout === 'two'
                       ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
                       : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                  }`}
+                    }`}
                   title="Two Columns: English and Telugu side-by-side"
                 >
                   <Columns className="w-3 h-3" />
@@ -441,11 +440,10 @@ const QuestionBuilderTab = ({
                 <button
                   type="button"
                   onClick={() => setQuestionColumnsLayout('single')}
-                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                    questionColumnsLayout === 'single'
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${questionColumnsLayout === 'single'
                       ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
                       : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                  }`}
+                    }`}
                   title="Single Column: English and Telugu stacked"
                 >
                   <Rows className="w-3 h-3" />
@@ -456,7 +454,7 @@ const QuestionBuilderTab = ({
 
             {/* English & Telugu Question Editors (Two Columns or Single Column) */}
             <div className={questionColumnsLayout === 'two' ? "grid grid-cols-1 lg:grid-cols-2 gap-3.5" : "space-y-3.5"}>
-              
+
               {/* English Question Editor Column */}
               <div className="flex flex-col space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -487,7 +485,7 @@ const QuestionBuilderTab = ({
                 />
                 {translationSuccess && (
                   <div className="text-2xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Translated to Telugu successfully with math terminology!
+                    <Check className="w-3 h-3" /> Translated into natural, understandable Telugu exam sentence!
                   </div>
                 )}
               </div>
@@ -857,7 +855,7 @@ const QuestionBuilderTab = ({
       {/* RIGHT COLUMN: Live Question Preview (5 cols on lg) */}
       <div className="lg:col-span-5 space-y-4">
         <div className="sticky top-20 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs p-5 md:p-6">
-          
+
           {/* Preview Header */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -902,7 +900,7 @@ const QuestionBuilderTab = ({
 
           {/* Realistic Book Page Sheet Preview */}
           <div className="mt-4 p-5 bg-amber-50/30 dark:bg-slate-950/60 rounded-xl border border-amber-200/60 dark:border-slate-800 font-sans shadow-inner">
-            
+
             {/* Chapter Running Indicator */}
             <div className="text-2xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 pb-2 mb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <span>{currentChapter.name} • <span className="font-telugu font-bold">{currentChapter.teluguName}</span></span>
@@ -911,7 +909,7 @@ const QuestionBuilderTab = ({
 
             {/* Question Card formatted like official book */}
             <div className="space-y-2.5">
-              
+
               {/* Subsection Badge */}
               {(formData.subsectionId || formData.topic) && (
                 <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-2xs font-semibold border border-blue-200 dark:border-blue-800/40">
@@ -922,7 +920,7 @@ const QuestionBuilderTab = ({
                   </span>
                 </div>
               )}
-              
+
               {/* Adaptive Question Body: fits into text div if aspect ratio is wide */}
               <AdaptiveQuestionBody
                 englishQuestion={formData.englishQuestion}

@@ -7,6 +7,7 @@ const DRAFT_KEY = 'exam_maker_draft_v1';
 const SETTINGS_KEY = 'exam_maker_settings_v1';
 const BOOKS_KEY = 'exam_maker_books_v1';
 const ACTIVE_BOOK_KEY = 'exam_maker_active_book_v1';
+const GEMINI_API_KEY = 'exam_maker_gemini_api_key_v1';
 
 export const DEFAULT_BOOKS = [
   {
@@ -73,6 +74,7 @@ export const DEFAULT_BOOK_SETTINGS = {
   examName: 'RRB Technician',
   examDate: '2026-03-09',
   shift: 'Shift-02',
+  geminiApiKey: '',
   applyExamDetailsToAll: false,
   includeInlineAnswers: false,
   includeInlineSolutions: false,
@@ -247,4 +249,25 @@ export const clearAllLocalStorage = () => {
     return false;
   }
 };
+
+export const getStoredGeminiKey = () => {
+  try {
+    return localStorage.getItem(GEMINI_API_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+};
+
+export const saveStoredGeminiKey = (key) => {
+  try {
+    if (!key || !key.trim()) {
+      localStorage.removeItem(GEMINI_API_KEY);
+    } else {
+      localStorage.setItem(GEMINI_API_KEY, key.trim());
+    }
+  } catch (e) {
+    console.error('Failed to save Gemini key:', e);
+  }
+};
+
 
