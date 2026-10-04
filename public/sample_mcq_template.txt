@@ -1,0 +1,45 @@
+Chapter: Percentage
+
+Q1:
+English: What is 20% of 500?
+Telugu: 500 లో 20% ఎంత?
+A: 50
+B: 100
+C: 150
+D: 200
+Answer: B
+Exam: RRB Group D
+Date: 01/12/2025
+Shift: 01
+Difficulty: Easy
+Solution: 20% of 500 = (20/100) * 500 = 100.
+
+Q2:
+English: A student scored 180 marks out of 300. What is his percentage?
+Telugu: ఒక విద్యార్థి 300 మార్కులకు గాను 180 మార్కులు పొందాడు. అతని శాతం ఎంత?
+A: 50%
+B: 55%
+C: 60%
+D: 65%
+Answer: C
+Exam: RRB NTPC
+Date: 15/01/2026
+Shift: 02
+Difficulty: Easy
+Solution: Percentage = (180 / 300) * 100 = 60%.
+
+Q3:
+English: In the given figure, $O$ is the centre of the circle and $\triangle ABC$ is inscribed in it. If $\angle BOC = 160^\circ$, find $\angle BAC$.
+Telugu: ఇచ్చిన చిత్రంలో $O$ వృత్త కేంద్రం మరియు అందులో $\triangle ABC$ అంతర్లిఖితమై ఉంది. $\angle BOC = 160^\circ$ అయితే, $\angle BAC$ విలువ ఎంత?
+Image: /diagrams/triangle_in_circle.svg
+A: 70°
+B: 80°
+C: 85°
+D: 90°
+Answer: B
+Exam: RRB Technician
+Date: 11/02/2026
+Shift: 01
+Difficulty: Medium
+Solution: The angle subtended by an arc at the circumference is half the angle subtended at the centre. $\angle BAC = \frac{1}{2} \angle BOC = \frac{160^\circ}{2} = 80^\circ$.
+
